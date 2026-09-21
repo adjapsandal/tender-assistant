@@ -126,6 +126,136 @@ python cli_main.py                    # консольный интерфейс
 Секреты в репозиторий не коммитятся: `.env` в `.gitignore`, в `.env.example`
 только имена переменных и заглушки.
 
+## pgvector
+
+Оценка релевантности строится на сравнении векторов, поэтому обычного
+PostgreSQL недостаточно — нужно расширение
+[pgvector](https://github.com/pgvector/pgvector). Оно добавляет тип колонки
+`vector` и операторы расстояния, то есть позволяет хранить эмбеддинги рядом
+с данными и искать по близости прямо в SQL, без отдельной векторной базы.
+
+### Как используется здесь
+
+Эмбеддинги на 1536 измерений (`text-embedding-3-small`) хранятся в трёх
+таблицах:
+
+| Таблица | Что за вектор |
+|---|---|
+| `companies.embedding` | Профиль компании — эталон, с которым сравниваются закупки. Либо из описания, либо центроид по выигранным тендерам |
+| `tenders.embedding` | Текст найденного тендера вместе с содержимым вложений |
+| `won_tenders.embedding` | Каждый импортированный выигранный тендер, из них считается центроид |
+
+В модели колонка объявляется типом из `pgvector.sqlalchemy`:
+
+```python
+from pgvector.sqlalchemy import Vector
+
+embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+```
+
+Поиск похожих тендеров идёт средствами базы — сортировкой по косинусному
+расстоянию (`database/repositories.py`):
+
+```python
+select(Tender)
+    .where(Tender.company_id == company_id, Tender.embedding.isnot(None))
+    .order_by(Tender.embedding.cosine_distance(embedding))
+    .limit(limit)
+```
+
+`cosine_distance` разворачивается в оператор `<=>`. Остальные операторы
+pgvector: `<->` — евклидово расстояние, `<#>` — отрицательное скалярное
+произведение.
+
+Ранжирование по категориям (`ml/ranker.py`) считается в Python: там к
+близости добавляются веса по ключевым словам, стоп-словам и совпадению
+с SKU, поэтому одной сортировки в SQL не хватает.
+
+### Установка
+
+В Docker ничего делать не нужно: образ `pgvector/pgvector:pg16` уже содержит
+расширение, а `init-db.sql` включает его при первом запуске контейнера.
+
+Для своего PostgreSQL — выберите способ под вашу систему. Номер версии
+в командах должен совпадать с версией сервера:
+
+```bash
+# Debian / Ubuntu
+sudo apt install postgresql-16-pgvector
+
+# RHEL / Rocky / Fedora
+sudo yum install pgvector_16
+
+# macOS
+brew install pgvector
+```
+
+Сборка из исходников на Linux и macOS:
+
+```bash
+git clone --branch v0.8.6 https://github.com/pgvector/pgvector.git
+cd pgvector
+make
+sudo make install
+```
+
+На Windows нужен Visual Studio с поддержкой C++. В консоли
+«x64 Native Tools Command Prompt for VS», запущенной от администратора:
+
+```bat
+set "PGROOT=C:\Program Files\PostgreSQL\16"
+git clone --branch v0.8.6 https://github.com/pgvector/pgvector.git
+cd pgvector
+nmake /F Makefile.win
+nmake /F Makefile.win install
+```
+
+Установка кладёт файлы расширения на диск, но в базе его ещё нет. Включить:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+Это делает первая миграция, так что при обычном `alembic upgrade head`
+отдельно выполнять команду не нужно. Но `CREATE EXTENSION` требует прав
+суперпользователя — pgvector не относится к доверенным расширениям.
+Если приложение ходит в базу под обычным пользователем, включите
+расширение заранее из-под `postgres`.
+
+Проверить, что всё на месте:
+
+```sql
+SELECT extversion FROM pg_extension WHERE extname = 'vector';
+```
+
+Пусто — расширение не включено в этой базе. Ошибка `could not open
+extension control file` при `CREATE EXTENSION` означает, что оно не
+установлено на сервере.
+
+### Индекс
+
+Индекса по векторным колонкам здесь нет: запрос выполняется полным
+перебором. На текущих объёмах — тысячи тендеров на компанию — это
+незаметно, а точность при переборе стопроцентная. Если записей станут
+сотни тысяч, добавьте приблизительный индекс:
+
+```sql
+CREATE INDEX ON tenders USING hnsw (embedding vector_cosine_ops);
+```
+
+Класс операторов должен соответствовать метрике: для косинусного
+расстояния — `vector_cosine_ops`, иначе индекс не будет использован.
+HNSW даёт лучшее соотношение скорости и точности и строится сразу;
+альтернатива — IVFFlat, он легче по памяти, но требует данных в таблице
+на момент создания:
+
+```sql
+CREATE INDEX ON tenders USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
+Оба индекса приблизительные: они ускоряют поиск ценой того, что часть
+соседей может потеряться.
+
 ## Тесты
 
 ```bash
