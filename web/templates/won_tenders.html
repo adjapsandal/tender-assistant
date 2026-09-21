@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Выигранные тендеры{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Выигранные тендеры ({{ won_count }})</h2>
+
+    {% if request.query_params.get('success') == 'centroid_updated' %}
+    <div class="alert alert-success">Центроид пересчитан на основе {{ won_count }} тендеров. Embedding компании обновлен.</div>
+    {% endif %}
+
+    {% if request.query_params.get('error') == 'no_embeddings' %}
+    <div class="alert alert-error">Нет embeddings для расчета центроида. Сначала импортируйте выигранные тендеры.</div>
+    {% endif %}
+
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    {% if info %}
+    <div class="alert alert-info">{{ info }}</div>
+    {% endif %}
+
+    <div class="detail-section">
+        <h3>Импорт из папки</h3>
+        <p style="font-size: 13px; color: #777; margin-bottom: 12px;">
+            Укажите путь к папке с подпапками (каждая подпапка = один тендер).
+            В подпапке: файлы документов + необязательный info.txt (первая строка = название).
+        </p>
+        <form method="post" action="/won-tenders/import">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="folder_path">Путь к папке</label>
+                    <input type="text" id="folder_path" name="folder_path"
+                           placeholder="won_tenders" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Импортировать</button>
+        </form>
+    </div>
+
+    {% if won_tenders %}
+    <div class="detail-section" style="margin-top: 24px;">
+        <h3>Центроид (golden vector)</h3>
+        <p style="font-size: 13px; color: #777; margin-bottom: 12px;">
+            Пересчитать embedding компании как среднее всех выигранных тендеров.
+            {% if has_centroid %}Текущий центроид активен.{% else %}Центроид еще не рассчитан.{% endif %}
+        </p>
+        <form method="post" action="/won-tenders/recalculate" style="display: inline;">
+            <button type="submit" class="btn btn-success btn-sm">
+                {% if has_centroid %}Пересчитать центроид{% else %}Рассчитать центроид{% endif %}
+            </button>
+        </form>
+    </div>
+
+    <div class="detail-section" style="margin-top: 24px;">
+        <h3>Список</h3>
+        <table class="tender-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Название</th>
+                    <th>Папка</th>
+                    <th>Embedding</th>
+                    <th>Дата</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for wt in won_tenders %}
+                <tr>
+                    <td>{{ wt.title[:80] }}{% if wt.title|length > 80 %}...{% endif %}</td>
+                    <td style="font-size: 12px; color: #777;">{{ wt.source_folder or '' }}</td>
+                    <td>
+                        {% if wt.embedding is not none %}
+                        <span class="badge" style="background: #28a745;">OK</span>
+                        {% else %}
+                        <span class="badge" style="background: #dc3545;">Нет</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 12px;">{{ wt.created_at.strftime('%d.%m.%Y') if wt.created_at else '' }}</td>
+                    <td>
+                        <form method="post" action="/won-tenders/{{ wt.id }}/delete"
+                              onsubmit="return confirm('Удалить этот тендер?');"
+                              style="display: inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">Удалить</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

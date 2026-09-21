@@ -1,0 +1,40 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "alembic/versions", "database/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# В выражениях SQLAlchemy нужно именно `== True`: `is True` вычисляется
+# в Python и до SQL не доходит.
+ignore = ["E712"]
+
+# Depends(), Query() и File() в значениях по умолчанию — штатный способ
+# объявлять зависимости в FastAPI, а не ошибка B008.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.File",
+    "fastapi.Form",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Переменные окружения выставляются до импорта приложения — иначе
+# конфигурация успевает прочитаться со старыми значениями.
+"tests/conftest.py" = ["E402"]
+# sys.path правится до импортов проекта.
+"web_main.py" = ["E402"]
+"main.py" = ["E402"]
+# Длинные строки здесь — тексты промптов и заголовок User-Agent.
+# Перенос изменил бы то, что уходит в модель и в запрос.
+"services/document.py" = ["E501"]
+"services/document_gen.py" = ["E501"]
+"services/parser.py" = ["E501"]

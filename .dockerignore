@@ -1,0 +1,38 @@
+# Секреты и данные клиента — не должны попадать в образ
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+won_tenders/
+dump.sql
+*.dump
+*.backup
+
+# Рабочие каталоги, наполняются в рантайме
+cache/
+downloads/
+outputs/
+tmp/
+temp/
+logs/
+*.log
+
+# Окружение и артефакты Python
+.venv/
+venv/
+ENV/
+env/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Git и IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+
+# Документация не нужна в рантайме
+*.md

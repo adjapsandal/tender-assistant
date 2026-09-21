@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Тендер {{ tender.tender_number }}{% endblock %}
+
+{% block content %}
+{% set cat = category_info(tender.category) %}
+
+<div class="card">
+    <div class="detail-header">
+        <div>
+            <h2>{{ tender.title }}</h2>
+        </div>
+        <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-size: 28px; font-weight: 700; color: {{ cat.color }};">
+                {{ '%.1f' % (tender.relevance_score or 0) }}%
+            </div>
+            <span class="badge" style="background: {{ cat.color }};">
+                {{ cat.emoji }} {{ cat.label }}
+            </span>
+        </div>
+    </div>
+
+    <div class="detail-meta">
+        <div class="meta-item">
+            <span class="label">Номер:</span> {{ tender.tender_number }}
+        </div>
+        <div class="meta-item">
+            <span class="label">Заказчик:</span> {{ tender.customer or '—' }}
+        </div>
+        <div class="meta-item">
+            <span class="label">Цена:</span> {{ tender.price or '—' }}
+        </div>
+        <div class="meta-item">
+            <span class="label">Срок:</span> {{ tender.deadline or '—' }}
+        </div>
+        <div class="meta-item">
+            <span class="label">Статус:</span> {{ tender.status or 'new' }}
+        </div>
+        {% if tender.url %}
+        <div class="meta-item">
+            <span class="label">Источник:</span>
+            <a href="{{ tender.url }}" target="_blank" style="color: #4a6cf7;">rostender.info</a>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if tender.risk_flags %}
+    <div class="detail-section">
+        <h3>Риски</h3>
+        <ul>
+            {% for flag in tender.risk_flags %}
+            <li>{{ flag }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if tender.missing_items %}
+    <div class="detail-section">
+        <h3>Отсутствует</h3>
+        <ul>
+            {% for item in tender.missing_items %}
+            <li>{{ item }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if tender.description %}
+    <div class="detail-section">
+        <h3>Описание</h3>
+        <p>{{ tender.description }}</p>
+    </div>
+    {% endif %}
+
+    {% if tender.requirements %}
+    <div class="detail-section">
+        <h3>Требования</h3>
+        <p>{{ tender.requirements }}</p>
+    </div>
+    {% endif %}
+
+    {% if generated_files %}
+    <div class="detail-section">
+        <h3>Сгенерированные документы</h3>
+        <ul class="files-list">
+            {% for f in generated_files %}
+            <li>
+                <a href="/outputs/{{ tender.tender_number }}/{{ f }}">{{ f }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="actions">
+        <a href="/tenders/{{ tender.id }}/download" class="btn btn-secondary btn-sm">
+            Скачать файлы тендера
+        </a>
+        <form method="post" action="/tenders/{{ tender.id }}/generate" style="display: inline;">
+            <button type="submit" class="btn btn-success btn-sm">
+                {% if generated_files %}Пересоздать документы{% else %}Сгенерировать документы{% endif %}
+            </button>
+        </form>
+        <a href="/results" class="btn btn-secondary btn-sm">Назад к списку</a>
+    </div>
+</div>
+{% endblock %}
