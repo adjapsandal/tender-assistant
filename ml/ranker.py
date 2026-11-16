@@ -35,19 +35,9 @@ async def calculate_relevance(
     won_tender_embeddings: list[list[float]] | None = None,
 ) -> TenderScoreResult:
     """
-    Calculate relevance score for a tender.
+    Считает релевантность тендера для компании.
 
-    Простая логика: сравниваем embedding тендера с embedding компании.
-
-    Args:
-        tender: Tender to evaluate
-        company: Company profile
-        skus: Company's SKUs (не используется в упрощённой версии)
-        exclusion_words: Stop-words that exclude tender
-        won_tender_embeddings: Embeddings of previously won tenders
-
-    Returns:
-        TenderScoreResult with score and details
+    skus сейчас не используется: сравнение идёт с профилем компании целиком.
     """
     # Check if tender has embedding
     if tender.embedding is None:
