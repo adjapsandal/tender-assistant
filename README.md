@@ -178,39 +178,8 @@ pgvector: `<->` — евклидово расстояние, `<#>` — отри�
 В Docker ничего делать не нужно: образ `pgvector/pgvector:pg16` уже содержит
 расширение, а `init-db.sql` включает его при первом запуске контейнера.
 
-Для своего PostgreSQL — выберите способ под вашу систему. Номер версии
-в командах должен совпадать с версией сервера:
-
-```bash
-# Debian / Ubuntu
-sudo apt install postgresql-16-pgvector
-
-# RHEL / Rocky / Fedora
-sudo yum install pgvector_16
-
-# macOS
-brew install pgvector
-```
-
-Сборка из исходников на Linux и macOS:
-
-```bash
-git clone --branch v0.8.6 https://github.com/pgvector/pgvector.git
-cd pgvector
-make
-sudo make install
-```
-
-На Windows нужен Visual Studio с поддержкой C++. В консоли
-«x64 Native Tools Command Prompt for VS», запущенной от администратора:
-
-```bat
-set "PGROOT=C:\Program Files\PostgreSQL\16"
-git clone --branch v0.8.6 https://github.com/pgvector/pgvector.git
-cd pgvector
-nmake /F Makefile.win
-nmake /F Makefile.win install
-```
+Для своего PostgreSQL расширение ставится отдельно, способы описаны
+в [документации pgvector](https://github.com/pgvector/pgvector#installation).
 
 Установка кладёт файлы расширения на диск, но в базе его ещё нет. Включить:
 
