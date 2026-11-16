@@ -54,11 +54,6 @@ COMPANY_PROFILE = {
 }
 
 
-# =============================================================================
-# Module-level font registration (called once at import)
-# =============================================================================
-
-
 def _register_font() -> str:
     """Register and return font name for PDF generation."""
     if not PDF_AVAILABLE:

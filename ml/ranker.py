@@ -15,11 +15,6 @@ from ml.embeddings import cosine_similarity, to_list
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Data Classes
-# =============================================================================
-
-
 @dataclass
 class TenderScoreResult:
     """Result of tender relevance calculation"""
@@ -30,11 +25,6 @@ class TenderScoreResult:
     risk_flags: list[str]
     missing_items: list[str]
     modifiers: dict[str, float]  # For debugging
-
-
-# =============================================================================
-# Main Ranking Function
-# =============================================================================
 
 
 async def calculate_relevance(
@@ -177,11 +167,6 @@ def get_category(score: float) -> str:
         return "possible"
     else:
         return "low"
-
-
-# =============================================================================
-# Report Generation
-# =============================================================================
 
 
 def generate_missing_report(result: TenderScoreResult, tender: Tender) -> str:

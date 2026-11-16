@@ -37,11 +37,6 @@ except ImportError:
     BS4_AVAILABLE = False
 
 
-# =============================================================================
-# Module-level constants
-# =============================================================================
-
-
 def _get_supported_formats() -> list[str]:
     """Get list of supported file formats based on available libraries."""
     formats = ["txt", "rtf", "zip"]
@@ -56,11 +51,6 @@ def _get_supported_formats() -> list[str]:
 
 # Compute once at module import
 SUPPORTED_FORMATS = _get_supported_formats()
-
-
-# =============================================================================
-# Main reading functions
-# =============================================================================
 
 
 def read_file(filepath: str) -> str:
@@ -138,11 +128,6 @@ def read_directory(directory: str, recursive: bool = True) -> str:
         results.append(content)
 
     return "\n".join(results)
-
-
-# =============================================================================
-# Format-specific readers
-# =============================================================================
 
 
 def _read_txt(filepath: str) -> str:
@@ -269,11 +254,6 @@ def _read_zip(filepath: str) -> str:
         return "\n\n".join(result)
     except Exception as e:
         return str(e)
-
-
-# =============================================================================
-# Helper functions
-# =============================================================================
 
 
 def _is_html_content(filepath: str) -> bool:

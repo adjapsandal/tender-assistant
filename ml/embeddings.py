@@ -13,9 +13,6 @@ from common.config import config
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# OpenAI Client (singleton)
-# =============================================================================
 
 _client: AsyncOpenAI | None = None
 
@@ -27,10 +24,6 @@ def get_client() -> AsyncOpenAI:
         _client = AsyncOpenAI(api_key=config.OPENAI_API_KEY, base_url=config.OPENAI_BASE_URL)
     return _client
 
-
-# =============================================================================
-# Embedding Functions
-# =============================================================================
 
 MAX_EMBEDDING_CHARS = 15000  # ~6000-7500 tokens for Russian, safely under 8192 limit
 
@@ -85,11 +78,6 @@ async def batch_create_embeddings(texts: list[str]) -> list[list[float]]:
         raise
 
 
-# =============================================================================
-# Similarity Functions
-# =============================================================================
-
-
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     """
     Calculate cosine similarity between two vectors.
@@ -135,11 +123,6 @@ def normalize_text(text: str) -> str:
     return " ".join(text.strip().lower().split())
 
 
-# =============================================================================
-# Cache
-# =============================================================================
-
-
 class EmbeddingCache:
     """
     Simple in-memory cache for embeddings to avoid recomputation.
@@ -177,11 +160,6 @@ class EmbeddingCache:
 embedding_cache = EmbeddingCache()
 
 
-# =============================================================================
-# Utility Functions
-# =============================================================================
-
-
 def to_list(embedding) -> list[float] | None:
     """
     Safely convert embedding (numpy array or list) to list.
@@ -199,11 +177,6 @@ def to_list(embedding) -> list[float] | None:
     if hasattr(embedding, "__iter__"):
         return list(embedding)
     return None
-
-
-# =============================================================================
-# High-level Functions
-# =============================================================================
 
 
 async def get_embedding(text: str, use_cache: bool = True) -> list[float]:
