@@ -1,13 +1,9 @@
 """
-Tender ranking functions using embeddings and rule-based modifiers.
+Оценка релевантности тендера (0–100).
 
-Calculates relevance score (0-100%) for tenders based on:
-1. Semantic similarity (cosine similarity)
-2. Exclusion filters (stop-words)
-3. SKU matches
-4. Certificate requirements
-5. Price range
-6. Historical performance
+1. Базовая оценка: косинусная близость тендера к профилю компании.
+2. Стоп-слова: тендер с исключающим словом сразу получает категорию excluded.
+3. Бонус за сходство с выигранными тендерами (до +15).
 """
 
 import logging
@@ -58,7 +54,7 @@ async def calculate_relevance(
         company: Company profile
         skus: Company's SKUs (не используется в упрощённой версии)
         exclusion_words: Stop-words that exclude tender
-        won_tender_embeddings: Embeddings of previously won tenders (не используется)
+        won_tender_embeddings: Embeddings of previously won tenders
 
     Returns:
         TenderScoreResult with score and details
@@ -144,161 +140,6 @@ async def calculate_relevance(
         missing_items=missing_items,
         modifiers=modifiers,
     )
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def find_matching_skus(
-    tender_embedding: list[float], skus: list[SKU], threshold: float = 0.6
-) -> list[tuple[SKU, float]]:
-    """
-    Find SKUs that match tender by semantic similarity.
-
-    Args:
-        tender_embedding: Tender embedding vector
-        skus: List of SKUs to check
-        threshold: Minimum similarity threshold
-
-    Returns:
-        List of (SKU, similarity) tuples sorted by similarity descending
-    """
-    matches = []
-
-    for sku in skus:
-        # Convert numpy array to list
-        sku_emb = to_list(sku.embedding)
-        if sku_emb is None or len(sku_emb) == 0 or not sku.is_active:
-            continue
-
-        similarity = cosine_similarity(tender_embedding, sku_emb)
-
-        if similarity >= threshold:
-            matches.append((sku, similarity))
-
-    # Sort by similarity descending
-    matches.sort(key=lambda x: x[1], reverse=True)
-    return matches
-
-
-def check_certificates(tender: Tender, matched_skus: list[tuple[SKU, float]]) -> tuple[float, list[str], list[str]]:
-    """
-    Check certificate requirements.
-
-    Returns: (modifier, risk_flags, missing_items)
-    """
-    tender_text = f"{tender.title} {tender.description} {tender.requirements}".lower()
-
-    has_ru_req = "регистрац" in tender_text or "ру " in tender_text or " руп" in tender_text
-    has_ss_req = "сертификат соответств" in tender_text or "сс " in tender_text
-    has_gisp_req = "гисп" in tender_text or "гост" in tender_text
-
-    modifier = 0
-    risk_flags = []
-    missing_items = []
-
-    # Check matched SKUs for certificates
-    if matched_skus:
-        for sku, _ in matched_skus:
-            if has_ru_req and not sku.has_ru:
-                missing_items.append(f"РУ сертификат для {sku.name}")
-                modifier -= 5
-            elif has_ru_req and sku.has_ru:
-                modifier += 2.5
-
-            if has_ss_req and not sku.has_ss:
-                missing_items.append(f"СС сертификат для {sku.name}")
-                modifier -= 5
-            elif has_ss_req and sku.has_ss:
-                modifier += 2.5
-
-            if has_gisp_req and not sku.has_gisp:
-                missing_items.append(f"ГИСП для {sku.name}")
-                modifier -= 5
-            elif has_gisp_req and sku.has_gisp:
-                modifier += 2.5
-
-    # If certificates required but no SKUs matched
-    if (has_ru_req or has_ss_req or has_gisp_req) and not matched_skus:
-        if has_ru_req:
-            missing_items.append("РУ сертификат")
-        if has_ss_req:
-            missing_items.append("СС сертификат")
-        if has_gisp_req:
-            missing_items.append("ГИСП")
-        modifier -= 15
-
-    # Bonus for having all certificates
-    if modifier > 0 and not missing_items:
-        risk_flags.append("Все требуемые сертификаты имеются")
-        modifier = min(modifier, 10)
-
-    return modifier, risk_flags, missing_items
-
-
-def check_shelf_life(tender: Tender, matched_skus: list[tuple[SKU, float]]) -> tuple[float, list[str], list[str]]:
-    """
-    Check shelf life requirements.
-
-    Returns: (modifier, risk_flags, missing_items)
-    """
-    tender_text = f"{tender.title} {tender.description} {tender.requirements}".lower()
-
-    # Extract shelf life requirement (e.g., "срок годности 18 месяцев")
-    import re
-
-    shelf_match = re.search(r"срок.*годност[ии].*?(\d+)\s*месяц", tender_text)
-    if not shelf_match:
-        shelf_match = re.search(r"(\d+)\s*месяц.*годност", tender_text)
-
-    if not shelf_match:
-        return 0, [], []
-
-    required_months = int(shelf_match.group(1))
-
-    modifier = 0
-    risk_flags = []
-    missing_items = []
-
-    if matched_skus:
-        for sku, _ in matched_skus:
-            if sku.shelf_life_months and sku.shelf_life_months < required_months:
-                risk_flags.append(f"Срок годности {sku.name}: {sku.shelf_life_months}м < требуемых {required_months}м")
-                modifier -= 10
-            elif sku.shelf_life_months and sku.shelf_life_months >= required_months:
-                modifier += 5
-
-    return max(modifier, -20), risk_flags, missing_items
-
-
-def check_price_range(tender: Tender, matched_skus: list[tuple[SKU, float]]) -> float:
-    """
-    Check if tender price is in acceptable range.
-
-    Returns: Modifier value (0 to +5)
-    """
-    # Extract price from tender string (e.g., "2 500 000 ₽")
-    import re
-
-    price_match = re.search(r"([\d\s]+)", str(tender.price))
-    if not price_match:
-        return 0
-
-    try:
-        tender_price = float(price_match.group(1).replace(" ", ""))
-
-        # Check if any SKU can cover this price range
-        if matched_skus:
-            for sku, _ in matched_skus:
-                if sku.price_min and sku.price_max:
-                    if sku.price_min <= tender_price <= sku.price_max:
-                        return 5.0
-    except (ValueError, AttributeError):
-        pass
-
-    return 0
 
 
 def check_historical_similarity(tender_embedding: list[float], won_tender_embeddings: list[list[float]]) -> float:
